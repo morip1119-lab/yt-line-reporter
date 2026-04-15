@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YouTube レポート 実行</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Meiryo", sans-serif;
+      background: #f0f4f8;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 20px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.10);
+      padding: 40px 32px;
+      max-width: 420px;
+      width: 100%;
+      text-align: center;
+    }
+
+    .icon { font-size: 52px; margin-bottom: 12px; }
+
+    h1 {
+      font-size: 22px;
+      font-weight: 800;
+      color: #1e293b;
+      margin-bottom: 6px;
+    }
+
+    .subtitle {
+      font-size: 13px;
+      color: #64748b;
+      margin-bottom: 28px;
+    }
+
+    .run-btn {
+      width: 100%;
+      padding: 18px;
+      background: linear-gradient(135deg, #ef4444, #dc2626);
+      color: #fff;
+      border: none;
+      border-radius: 14px;
+      font-size: 18px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: transform 0.1s, box-shadow 0.1s;
+      box-shadow: 0 4px 14px rgba(220,38,38,0.35);
+      margin-bottom: 20px;
+    }
+
+    .run-btn:hover  { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(220,38,38,0.4); }
+    .run-btn:active { transform: translateY(0); }
+    .run-btn:disabled { background: #94a3b8; box-shadow: none; cursor: not-allowed; transform: none; }
+
+    .status {
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border-radius: 10px;
+      padding: 10px 16px;
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 24px;
+      transition: all 0.3s;
+    }
+    .status.hidden  { opacity: 0; }
+    .status.success { background: #f0fdf4; color: #16a34a; }
+    .status.error   { background: #fff1f2; color: #dc2626; }
+    .status.running { background: #eff6ff; color: #2563eb; }
+
+    .setting-toggle {
+      font-size: 12px;
+      color: #94a3b8;
+      cursor: pointer;
+      text-decoration: underline;
+      background: none;
+      border: none;
+      margin-bottom: 16px;
+      display: block;
+      margin-inline: auto;
+    }
+
+    .setting-panel {
+      background: #f8fafc;
+      border-radius: 12px;
+      padding: 16px;
+      text-align: left;
+      margin-top: 4px;
+    }
+
+    .setting-panel label {
+      font-size: 11px;
+      font-weight: 700;
+      color: #475569;
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .setting-panel input {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 12px;
+      font-family: monospace;
+      color: #334155;
+      margin-bottom: 8px;
+    }
+
+    .save-btn {
+      width: 100%;
+      padding: 8px;
+      background: #334155;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .note {
+      font-size: 11px;
+      color: #94a3b8;
+      margin-top: 16px;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+<div class="card">
+  <div class="icon">📊</div>
+  <h1>YouTube レポート</h1>
+  <p class="subtitle">ボタンを押すと今すぐ LINE に送信します</p>
+
+  <button class="run-btn" id="runBtn" onclick="runReport()">
+    ▶ 今すぐ実行
+  </button>
+
+  <div class="status hidden" id="status"></div>
+
+  <button class="setting-toggle" onclick="toggleSettings()">⚙ 設定</button>
+
+  <div class="setting-panel" id="settingPanel" style="display:none;">
+    <label>GitHub Personal Access Token</label>
+    <input type="password" id="patInput" placeholder="ghp_xxxxxxxxxxxx">
+    <button class="save-btn" onclick="saveSettings()">保存</button>
+  </div>
+
+  <p class="note">
+    初回のみ設定が必要です。<br>
+    トークンはこのブラウザにのみ保存されます。
+  </p>
+</div>
+
+<script>
+  const OWNER    = "morip1119-lab";
+  const REPO     = "yt-line-reporter";
+  const WORKFLOW = "daily-report.yml";
+  const REF      = "main";
+
+  window.onload = () => {
+    const saved = localStorage.getItem("gh_pat");
+    if (saved) document.getElementById("patInput").value = saved;
+  };
+
+  function toggleSettings() {
+    const panel = document.getElementById("settingPanel");
+    panel.style.display = panel.style.display === "none" ? "block" : "none";
+  }
+
+  function saveSettings() {
+    const pat = document.getElementById("patInput").value.trim();
+    if (!pat) { alert("トークンを入力してください"); return; }
+    localStorage.setItem("gh_pat", pat);
+    document.getElementById("settingPanel").style.display = "none";
+    showStatus("✅ 保存しました", "success");
+  }
+
+  async function runReport() {
+    const pat = localStorage.getItem("gh_pat") || document.getElementById("patInput").value.trim();
+    if (!pat) {
+      toggleSettings();
+      showStatus("⚠️ 先にトークンを設定してください", "error");
+      return;
+    }
+
+    const btn = document.getElementById("runBtn");
+    btn.disabled = true;
+    showStatus("⏳ 実行中...", "running");
+
+    try {
+      const res = await fetch(
+        `https://api.github.com/repos/${OWNER}/${REPO}/actions/workflows/${WORKFLOW}/dispatches`,
+        {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${pat}`,
+            "Accept": "application/vnd.github+json",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ ref: REF }),
+        }
+      );
+
+      if (res.status === 204) {
+        showStatus("✅ 実行しました！数分後に LINE に届きます", "success");
+      } else if (res.status === 401) {
+        showStatus("❌ トークンが正しくありません", "error");
+        toggleSettings();
+      } else {
+        showStatus(`❌ エラー: ${res.status}`, "error");
+      }
+    } catch (e) {
+      showStatus("❌ ネットワークエラー", "error");
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  function showStatus(msg, type) {
+    const el = document.getElementById("status");
+    el.textContent = msg;
+    el.className = `status ${type}`;
+  }
+</script>
+</body>
+</html>
