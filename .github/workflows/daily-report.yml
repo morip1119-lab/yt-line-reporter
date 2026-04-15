@@ -10,6 +10,8 @@ on:
 jobs:
   report:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       # ── 1. リポジトリをチェックアウト（DB ファイルも含む） ──────────────
