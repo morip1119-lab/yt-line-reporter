@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YouTube 日次レポート自動化ツール｜設計図解</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --red:    #ef4444;
+      --blue:   #3b82f6;
+      --green:  #22c55e;
+      --yellow: #f59e0b;
+      --purple: #a855f7;
+      --dark:   #1e293b;
+      --gray:   #64748b;
+      --light:  #f8fafc;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Meiryo", sans-serif;
+      background: #f0f4f8;
+      color: var(--dark);
+      line-height: 1.7;
+    }
+
+    /* ── Hero ── */
+    .hero {
+      background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+      color: #fff;
+      padding: 60px 24px 48px;
+      text-align: center;
+    }
+    .hero-badge {
+      display: inline-block;
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.25);
+      border-radius: 99px;
+      padding: 4px 14px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .05em;
+      margin-bottom: 16px;
+    }
+    .hero h1 {
+      font-size: clamp(24px, 5vw, 40px);
+      font-weight: 900;
+      margin-bottom: 12px;
+      line-height: 1.3;
+    }
+    .hero p {
+      font-size: 15px;
+      color: rgba(255,255,255,0.7);
+      max-width: 520px;
+      margin: 0 auto;
+    }
+
+    /* ── Section ── */
+    .section { max-width: 860px; margin: 0 auto; padding: 48px 20px; }
+    .section-label {
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .12em;
+      color: var(--blue);
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    .section-title {
+      font-size: clamp(20px, 4vw, 28px);
+      font-weight: 900;
+      color: var(--dark);
+      margin-bottom: 28px;
+    }
+
+    /* ── Overview card ── */
+    .overview-card {
+      background: #fff;
+      border-radius: 20px;
+      padding: 28px;
+      box-shadow: 0 2px 16px rgba(0,0,0,0.08);
+      margin-bottom: 16px;
+    }
+    .overview-card h3 {
+      font-size: 15px;
+      font-weight: 800;
+      color: var(--dark);
+      margin-bottom: 8px;
+    }
+    .overview-card p { font-size: 14px; color: var(--gray); }
+
+    /* ── Flow diagram ── */
+    .flow {
+      background: #fff;
+      border-radius: 20px;
+      padding: 32px 24px;
+      box-shadow: 0 2px 16px rgba(0,0,0,0.08);
+    }
+
+    .flow-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+    }
+
+    .flow-node {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      padding: 14px 18px;
+      border-radius: 14px;
+      min-width: 100px;
+      text-align: center;
+    }
+    .flow-node .emoji { font-size: 28px; }
+    .flow-node .label { font-size: 12px; font-weight: 700; line-height: 1.3; }
+    .flow-node .sub   { font-size: 10px; font-weight: 500; opacity: .75; }
+
+    .node-red    { background: #fff1f2; color: #be123c; }
+    .node-blue   { background: #eff6ff; color: #1d4ed8; }
+    .node-green  { background: #f0fdf4; color: #15803d; }
+    .node-yellow { background: #fffbeb; color: #b45309; }
+    .node-purple { background: #faf5ff; color: #7e22ce; }
+    .node-gray   { background: #f8fafc; color: #475569; }
+
+    .arrow {
+      font-size: 20px;
+      color: #cbd5e1;
+      flex-shrink: 0;
+    }
+
+    .flow-divider {
+      border: none;
+      border-top: 1px dashed #e2e8f0;
+      margin: 16px 0;
+    }
+
+    /* ── 4 parts ── */
+    .parts-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+    }
+
+    .part-card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 22px 18px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+      border-top: 4px solid;
+      position: relative;
+    }
+    .part-card.trigger { border-color: var(--red); }
+    .part-card.source  { border-color: var(--blue); }
+    .part-card.process { border-color: var(--purple); }
+    .part-card.deliver { border-color: var(--green); }
+
+    .part-num {
+      position: absolute;
+      top: -14px;
+      left: 16px;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 900;
+      color: #fff;
+    }
+    .trigger .part-num { background: var(--red); }
+    .source  .part-num { background: var(--blue); }
+    .process .part-num { background: var(--purple); }
+    .deliver .part-num { background: var(--green); }
+
+    .part-icon { font-size: 30px; margin-bottom: 8px; }
+    .part-name {
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+      color: var(--gray);
+    }
+    .part-title {
+      font-size: 15px;
+      font-weight: 800;
+      color: var(--dark);
+      margin-bottom: 8px;
+    }
+    .part-desc { font-size: 12px; color: var(--gray); line-height: 1.6; }
+
+    .tag-list { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 10px; }
+    .tag {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 99px;
+      background: var(--light);
+      color: var(--gray);
+      border: 1px solid #e2e8f0;
+    }
+
+    /* ── 3 tips ── */
+    .tips-list { display: flex; flex-direction: column; gap: 14px; }
+    .tip-card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 20px 22px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+    }
+    .tip-num {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: var(--dark);
+      color: #fff;
+      font-size: 16px;
+      font-weight: 900;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .tip-title { font-size: 15px; font-weight: 800; color: var(--dark); margin-bottom: 4px; }
+    .tip-desc  { font-size: 13px; color: var(--gray); line-height: 1.6; }
+
+    /* ── Data items ── */
+    .data-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+    }
+    .data-item {
+      background: #fff;
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      text-align: center;
+    }
+    .data-item .d-icon { font-size: 24px; margin-bottom: 6px; }
+    .data-item .d-label { font-size: 12px; font-weight: 700; color: var(--dark); }
+    .data-item .d-sub   { font-size: 11px; color: var(--gray); }
+
+    /* ── Tech stack ── */
+    .stack-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .stack-badge {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 8px 14px;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--dark);
+      box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+    }
+
+    /* ── Footer ── */
+    .footer {
+      text-align: center;
+      padding: 32px 20px 48px;
+      font-size: 12px;
+      color: #94a3b8;
+    }
+
+    @media (max-width: 600px) {
+      .flow-row { flex-direction: column; }
+      .arrow { transform: rotate(90deg); }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Hero -->
+<div class="hero">
+  <div class="hero-badge">🎓 報告ツール設計 図解</div>
+  <h1>YouTube 日次レポート<br>自動化ツール</h1>
+  <p>毎日12時にチャンネルの統計・コメント・TOP動画を<br>自動でLINEグループへ画像レポート送信するツール</p>
+</div>
+
+<!-- 完成イメージ -->
+<div class="section">
+  <div class="section-label">Overview</div>
+  <div class="section-title">完成イメージ</div>
+
+  <div class="overview-card" style="margin-bottom:16px;">
+    <h3>🎯 自動化したいこと</h3>
+    <p>複数のYouTubeチャンネルの登録者数・再生数・コメントを毎日収集し、見やすいレポート画像を生成してLINEグループに自動送信する。手動で毎日確認していた作業をゼロにする。</p>
+  </div>
+
+  <!-- Flow -->
+  <div class="flow">
+    <div class="flow-row">
+      <div class="flow-node node-red">
+        <div class="emoji">⏰</div>
+        <div class="label">毎日12:00</div>
+        <div class="sub">GitHub Actions</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="flow-node node-blue">
+        <div class="emoji">📺</div>
+        <div class="label">YouTube API</div>
+        <div class="sub">データ取得</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="flow-node node-gray">
+        <div class="emoji">🗄️</div>
+        <div class="label">SQLite DB</div>
+        <div class="sub">差分計算</div>
+      </div>
+    </div>
+    <div class="flow-row" style="justify-content:flex-end; padding-right: 40px;">
+      <div class="arrow" style="transform:rotate(90deg);">→</div>
+    </div>
+    <div class="flow-row" style="flex-direction:row-reverse;">
+      <div class="flow-node node-green">
+        <div class="emoji">💬</div>
+        <div class="label">LINEグループ</div>
+        <div class="sub">画像レポート着信</div>
+      </div>
+      <div class="arrow">←</div>
+      <div class="flow-node node-yellow">
+        <div class="emoji">📤</div>
+        <div class="label">LINE API</div>
+        <div class="sub">画像送信</div>
+      </div>
+      <div class="arrow">←</div>
+      <div class="flow-node node-purple">
+        <div class="emoji">🖼️</div>
+        <div class="label">HTML→PNG</div>
+        <div class="sub">Playwright生成</div>
+      </div>
+    </div>
+
+    <hr class="flow-divider">
+
+    <div class="flow-row">
+      <div class="flow-node node-red" style="min-width:130px;">
+        <div class="emoji">🖱️</div>
+        <div class="label">手動実行も可能</div>
+        <div class="sub">Webページのボタン</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 取得データ -->
+<div style="background:#fff; padding: 0;">
+<div class="section" style="padding-top: 0;">
+  <div class="section-label">Data</div>
+  <div class="section-title">取得するデータ</div>
+  <div class="data-grid">
+    <div class="data-item">
+      <div class="d-icon">👥</div>
+      <div class="d-label">登録者数</div>
+      <div class="d-sub">前日比増減付き</div>
+    </div>
+    <div class="data-item">
+      <div class="d-icon">▶️</div>
+      <div class="d-label">昨日の再生数</div>
+      <div class="d-sub">チャンネル合計</div>
+    </div>
+    <div class="data-item">
+      <div class="d-icon">💬</div>
+      <div class="d-label">昨日のコメント</div>
+      <div class="d-sub">全件表示</div>
+    </div>
+    <div class="data-item">
+      <div class="d-icon">🏆</div>
+      <div class="d-label">再生数 TOP10</div>
+      <div class="d-sub">ショート除く</div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- 4つのパーツ -->
+<div class="section">
+  <div class="section-label">4 Parts</div>
+  <div class="section-title">4つのパーツに分類</div>
+  <div class="parts-grid">
+
+    <div class="part-card trigger">
+      <div class="part-num">1</div>
+      <div class="part-icon">⏰</div>
+      <div class="part-name">Trigger</div>
+      <div class="part-title">トリガー</div>
+      <div class="part-desc">いつ・どのタイミングで動くか</div>
+      <div class="tag-list">
+        <span class="tag">毎日 12:00 JST</span>
+        <span class="tag">GitHub Actions cron</span>
+        <span class="tag">手動ボタン</span>
+      </div>
+    </div>
+
+    <div class="part-card source">
+      <div class="part-num">2</div>
+      <div class="part-icon">📺</div>
+      <div class="part-name">Source</div>
+      <div class="part-title">ソース元</div>
+      <div class="part-desc">どこからデータを取ってくるか</div>
+      <div class="tag-list">
+        <span class="tag">YouTube Data API v3</span>
+        <span class="tag">複数チャンネル対応</span>
+      </div>
+    </div>
+
+    <div class="part-card process">
+      <div class="part-num">3</div>
+      <div class="part-icon">⚙️</div>
+      <div class="part-name">Process</div>
+      <div class="part-title">処理する場所</div>
+      <div class="part-desc">データをどこで加工するか</div>
+      <div class="tag-list">
+        <span class="tag">GitHub Actions</span>
+        <span class="tag">Python</span>
+        <span class="tag">SQLite</span>
+        <span class="tag">Playwright</span>
+      </div>
+    </div>
+
+    <div class="part-card deliver">
+      <div class="part-num">4</div>
+      <div class="part-icon">📱</div>
+      <div class="part-name">Deliver</div>
+      <div class="part-title">届ける先</div>
+      <div class="part-desc">誰にどうやって届けるか</div>
+      <div class="tag-list">
+        <span class="tag">LINE Messaging API</span>
+        <span class="tag">複数グループ同時送信</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- 3つのコツ -->
+<div style="background:#1e293b;">
+<div class="section">
+  <div class="section-label" style="color:#60a5fa;">3 Tips</div>
+  <div class="section-title" style="color:#fff;">3つのコツの活用</div>
+  <div class="tips-list">
+
+    <div class="tip-card">
+      <div class="tip-num">1</div>
+      <div>
+        <div class="tip-title">既存のAPIを組み合わせる</div>
+        <div class="tip-desc">YouTube Data API・LINE Messaging API という既存サービスを活用し、自分で作るのはデータの「繋ぎ役」だけにした。ゼロから作らず、あるものを組み合わせることで短期間で完成できた。</div>
+      </div>
+    </div>
+
+    <div class="tip-card">
+      <div class="tip-num">2</div>
+      <div>
+        <div class="tip-title">サーバーレス（GitHub Actions）で運用コストゼロ</div>
+        <div class="tip-desc">自前サーバーを持たずに GitHub Actions の無料枠で毎日自動実行。PCの電源が切れていても動く。インフラ管理不要で運用が続けやすい。</div>
+      </div>
+    </div>
+
+    <div class="tip-card">
+      <div class="tip-num">3</div>
+      <div>
+        <div class="tip-title">AIと一緒に段階的に作る</div>
+        <div class="tip-desc">完成形を一度に作ろうとせず、「まず1チャンネル送れる」→「デザイン改善」→「複数チャンネル対応」→「自動化」と段階的に拡張。Cursorと対話しながら詰まった部分をその場で解決した。</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<!-- 技術スタック -->
+<div class="section">
+  <div class="section-label">Tech Stack</div>
+  <div class="section-title">使った技術</div>
+  <div class="stack-grid">
+    <div class="stack-badge">🐍 Python</div>
+    <div class="stack-badge">📺 YouTube Data API v3</div>
+    <div class="stack-badge">💬 LINE Messaging API</div>
+    <div class="stack-badge">🎭 Playwright</div>
+    <div class="stack-badge">🗄️ SQLite</div>
+    <div class="stack-badge">⚡ GitHub Actions</div>
+    <div class="stack-badge">🌐 GitHub Pages</div>
+    <div class="stack-badge">🤖 Cursor（AI）</div>
+  </div>
+</div>
+
+<div class="footer">
+  Powered by Cursor AI &nbsp;·&nbsp; YouTube × LINE 日次レポート自動化ツール
+</div>
+
+</body>
+</html>
