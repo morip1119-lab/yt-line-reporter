@@ -49,9 +49,10 @@ jobs:
 
       # ── 6. 更新された DB をリポジトリにコミット ─────────────────────────
       - name: Commit updated DB
+        continue-on-error: true
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add data/stats.db
           git diff --staged --quiet || git commit -m "chore: update stats.db [skip ci]"
-          git push
+          git push || echo "push skipped (nothing to push or permission issue)"
