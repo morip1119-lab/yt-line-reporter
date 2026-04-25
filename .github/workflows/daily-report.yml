@@ -44,7 +44,10 @@ jobs:
           CHANNEL_1_LINE_GROUP_IDS:   ${{ secrets.CHANNEL_1_LINE_GROUP_IDS }}
           CHANNEL_2_YT_HANDLE:        ${{ secrets.CHANNEL_2_YT_HANDLE }}
           CHANNEL_2_LINE_GROUP_IDS:   ${{ secrets.CHANNEL_2_LINE_GROUP_IDS }}
-          # チャンネルが増えたら CHANNEL_3_* を追加
+          # 旧形式 1 チャンネル用（CHANNEL_1_* 未使用のとき .env 互換のフォールバック）
+          YOUTUBE_CHANNEL_HANDLE:     ${{ secrets.YOUTUBE_CHANNEL_HANDLE }}
+          LINE_GROUP_ID:              ${{ secrets.LINE_GROUP_ID }}
+          # チャンネルが増えたら CHANNEL_3_* を workflow にも追加
         run: python run_scheduled.py
 
       # ── 6. 更新された DB をリポジトリにコミット ─────────────────────────

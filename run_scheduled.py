@@ -44,8 +44,11 @@ def main():
             )
             if result["line_sent"]:
                 logger.info("  → LINE 送信完了（%d グループ）", result.get("groups_sent", 0))
-            elif result.get("warning"):
-                logger.warning("  → %s", result["warning"])
+            else:
+                if result.get("warning"):
+                    logger.error("  → LINE 未送信: %s", result["warning"])
+                # レポートはできたが LINE に届いていない＝失敗扱い（従来はここで exit 0 になっていた）
+                all_ok = False
         else:
             logger.error("@%s エラー: %s", ch["handle"], result["error"])
             all_ok = False
